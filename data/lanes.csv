@@ -1,0 +1,21 @@
+lane_id,origin,destination,distance_km,avg_transit_days,toll_km,port_region
+L001,New York,Boston,1370.0,2.2,252,Newark
+L002,New York,Boston,871.0,1.1,241,Miami
+L003,Baltimore,Philadelphia,1104.0,1.2,24,Houston
+L004,Cincinnati,Cleveland,,1.3,12,Oakland
+L005,Charlotte,Richmond,786.0,1.3,266,Tacoma
+L006,Nashville,Louisville,1039.0,1.3,244,Long Beach
+L007,San Diego,Las Vegas,1147.0,1.7,142,Tacoma
+L008,Chicago,Memphis,839.0,1.5,107,Long Beach
+L009,Cincinnati,Cleveland,854.0,1.1,30,Savannah
+L010,New York,Boston,1106.0,1.1,76,Savannah
+L011,Kansas City,St. Louis,639.0,1.0,6,Charleston
+L012,Austin,San Antonio,446.0,0.7,150,Tacoma
+L013,Detroit,Columbus,1018.0,1.8,190,Tacoma
+L014,Los Angeles,Phoenix,699.0,0.5,36,Newark
+L015,Detroit,Columbus,324.0,0.5,96,Savannah
+L016,New York,Boston,656.0,0.5,51,Miami
+L017,Baltimore,Philadelphia,760.0,0.5,19,Charleston
+L018,Austin,San Antonio,542.0,0.8,130,Oakland
+L019,Sacramento,Fresno,452.0,0.8,162,Oakland
+L020,Nashville,Louisville,911.0,0.9,10,Savannah
