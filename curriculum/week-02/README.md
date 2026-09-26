@@ -51,34 +51,150 @@ Profile before you fix. `df.shape`, `df.dtypes`, `df.describe()`, and `df.isna()
 
 ### 4. SQL with DuckDB: joins, aggregations, window functions
 
-Python/pandas shapes a table; **SQL asks questions of it**, and SQL is how you will talk to DuckDB now, Spark later, and the Databricks lakehouse in Weeks 21 to 24. DuckDB is a zero-install embedded analytical database: it runs SQL directly over your DataFrames in-process, no server. The three verbs that matter this week:
+Pandas helps you shape a table. **SQL helps you ask questions about it.** DuckDB runs SQL directly on your pandas tables without a separate database server.
+
+Imagine these two small tables:
+
+`shipments`:
+
+| shipment_id | carrier_id | is_on_time |
+|---|---|---|
+| S001 | C01 | True |
+| S002 | C02 | False |
+
+`carriers`:
+
+| carrier_id | carrier_name |
+|---|---|
+| C01 | Fast Trucking |
+| C02 | North Freight |
+
+The shipment table stores `carrier_id`, not the carrier name. The ID is the link between the tables.
 
 | Verb | What it does | Week 2 example |
 |---|---|---|
-| **Join** | Re-attach master data via a foreign key | `JOIN carriers c ON s.carrier_id = c.carrier_id` |
-| **Aggregate** | Collapse rows into a group and reduce | `AVG(CAST(s.is_on_time AS INT))` per carrier/lane/month |
-| **Window** | Compute a value across a group *while keeping every row* | `RANK() OVER (PARTITION BY month ORDER BY on_time_rate DESC)` |
+| **Join** | Connect related tables using a shared ID | Add carrier details to shipments using `carrier_id` |
+| **Aggregate** | Group rows and calculate a summary | Calculate average on-time rate per carrier |
+| **Window** | Calculate group information while keeping each row | Rank carriers inside each month |
 
-A **window function** is the subtle one: `GROUP BY` *collapses* rows; a window computes a value across a sliding group but keeps each row, so you can rank every carrier *within* its own month, and DuckDB's `QUALIFY` filters on the window result directly ("top 2 carriers per month" is one clause). The rule of thumb: prefer `GROUP BY` when you want one row per group, and a window when you need a per-row value that depends on its neighbors, a rank, a running total, or a moving average.
+A **window function** is different from `GROUP BY`:
 
-| Question | Tool | Example |
-|---|---|---|
-| "What is the rate per group?" | `GROUP BY` | on-time rate by carrier / lane / month |
-| "Who ranks within each group?" | window + `RANK()` / `QUALIFY` | top-2 carriers per month |
+- `GROUP BY` combines many rows into one row per group.
+- A window function calculates across a group but keeps the original rows.
+
+Use `GROUP BY` to ask, “What is the rate per carrier?” Use a window function to ask,
+“Which carriers are in the top two each month?”
+
+**Join example:**
+
+```sql
+SELECT s.shipment_id, c.carrier_name
+FROM shipments s
+JOIN carriers c ON s.carrier_id = c.carrier_id
+```
+
+This reads as: “Take each shipment, find the carrier with the same ID, and show the carrier name.”
+
+**Aggregate example:**
+
+```sql
+SELECT carrier_id, AVG(CAST(is_on_time AS INT)) AS on_time_rate
+FROM shipments
+GROUP BY carrier_id
+```
+
+`True` becomes `1` and `False` becomes `0`. If a carrier has `[True, True, False]`, its rate is `(1 + 1 + 0) / 3 = 0.667`, or 66.7%.
+
+**Window example:**
+
+```sql
+RANK() OVER (PARTITION BY month ORDER BY on_time_rate DESC)
+```
+
+This means: “For each month, put the carrier with the highest rate in position 1.” Unlike `GROUP BY`, it can keep the carrier’s row while adding its rank.
 
 ### 5. Data validation (pandera) with explicit checks
 
-A cleaned table is a *claim*; a validation suite is the *proof*. The notebook writes 12 executable invariants, no duplicates, no `NaN` weights, all weights positive, referential integrity for `carrier_id`/`lane_id`, `is_on_time` boolean, `delay_hours` within `[-48, 240]`, and more, each an `assert`-style `check(name, cond)` that prints PASS/FAIL. This is the same verification discipline the whole program builds on (an eval tied to a requirement; see [`reference/knowledge-base/01-ai-engineering-discipline.md`](../../reference/knowledge-base/01-ai-engineering-discipline.md) §"Verification"). pandera formalizes this into a schema you can re-run on any future batch.
+A cleaned table is a **claim**. Validation is the **proof** that the table is safe to use.
+
+The notebook runs 12 checks, including:
+
+- no duplicate rows;
+- no missing weights;
+- all weights are positive;
+- every `carrier_id` and `lane_id` points to a real record;
+- `is_on_time` is a boolean;
+- `delay_hours` is within the allowed range.
+
+Each check prints `PASS` or `FAIL`. The table is not ready until all 12 checks pass.
+Pandera is a library that can turn these rules into a reusable dataframe schema.
+
+Think of validation like an inspection before a truck leaves the warehouse. For example:
+
+```python
+assert ships["weight_kg"].notna().all()
+```
+
+This means: “Every shipment must have a weight.” If even one weight is missing, the check fails. A failing check does not mean Python is broken; it means the data is not ready yet.
+
+Another check might be:
+
+```python
+assert not ships.duplicated().any()
+```
+
+This means: “There must not be any completely repeated shipment rows.” The validation gate prevents dirty data from silently moving to the next step.
 
 ### 6. Dataset versioning and reproducibility
 
-The reproducibility thread from Week 1 continues: the raw data is regenerable from a seed, and the cleaning recipe is *recorded*, so `raw → silver` is reproducible with one command. Weeks 21 to 24 turn this exact logic into a Databricks **medallion pipeline** (bronze → silver → gold). Treat "silver" not as a folder name but as a **contract**: known schema, known invariants, passing suite.
+Week 1 made the raw data reproducible with a seed. Week 2 applies the same idea to
+cleaning: record the steps so someone can repeat `raw -> silver` and get the same result.
 
-**Worked example 1: the cleaning arithmetic.** Under seed 42 the raw shipments table has 100,200 rows. `drop_duplicates()` removes **200** rows → 100,000. The 301 `NaN` weights are filled with the **per-commodity median** (overall median 852.0 kg; commodity medians run 843 kg for construction materials to 858 kg for apparel/paper). The 1 `NaN` lane distance is filled with the global median distance. The defensive drops (non-positive weight, impossible transit) remove **0 rows**, a useful finding in itself: those defects are *not* present, so the silver table lands at exactly **100,000 rows**. Writing each of these numbers into the report is what makes the pipeline auditable.
+In the medallion system used later in the course:
 
-**Worked example 2: the on-time rate is a mean of a boolean.** The headline KPI is `AVG(CAST(is_on_time AS INT))`. Casting `is_on_time` to 0/1 turns a boolean into a number whose average *is* the rate: of 100,000 silver rows, **79,566 are on time** → `0.7957`, i.e. a **79.6%** on-time rate (and **20.4%** late). This one line is the KPI every later model either predicts (Week 3 to 4) or improves, and it illustrates why a rate is just a mean of a binary.
+- **Bronze** means raw data.
+- **Silver** means cleaned and validated data.
+- **Gold** means summarized data ready for people or applications.
 
-**Worked example 3: a window asks what an aggregate can't.** Grouping on-time rate by month shows January at **0.7897** (78.97%). The window query then asks a *different* question a plain `GROUP BY` cannot answer: "which carriers lead *each* month?" `RANK() OVER (PARTITION BY month ORDER BY on_time_rate DESC)` with `QUALIFY rnk <= 2` returns the top two carriers per month *without collapsing the month groups*. The top carrier overall (C016 at 88.96% on-time) does not necessarily lead every month, the window exposes that month-to-month leadership, which a single aggregate hides. That is the difference between "what is the rate" and "who is winning, and when."
+Treat silver as a **contract**, not just a folder. It must have a known schema, meet
+known rules, and pass the validation suite.
+
+Here is the complete idea in plain language:
+
+```text
+raw CSV files
+    -> inspect and count problems
+    -> remove duplicates and fill approved missing values
+    -> run validation checks
+    -> save the silver tables
+```
+
+The cleaning recipe is the list of decisions in the middle. For example, “fill missing weight with the median for that commodity” is a recipe. If you write that decision down, another engineer can repeat it. If you only edit the file by hand, nobody knows exactly what happened.
+
+**Worked example.** With seed 42:
+
+- the raw table has 100,200 shipment rows;
+- removing 200 duplicates leaves 100,000 rows;
+- 301 missing weights are filled with the median for their commodity;
+- 1 missing lane distance is filled with the overall lane median;
+- no rows are removed for impossible weights or dates.
+
+The result is a silver table with exactly 100,000 shipments. Record these before-and-
+after numbers in the report so another person can audit the cleaning.
+
+The word **versioning** means keeping a record of which data and which steps produced the result. For this week, record the seed, the original row count, the number of rows removed, the missing-value counts, and the final row count. That record lets you compare a future version with this one.
+
+**SQL example.** `is_on_time` is `True` or `False`. SQL can cast these to `1` or `0`:
+
+```sql
+AVG(CAST(is_on_time AS INT))
+```
+
+The average is the on-time rate. For example, 79,566 on-time shipments out of 100,000
+gives `0.7957`, or 79.6%.
+
+**Window example.** `GROUP BY` can show the rate for each month. A window function can
+then rank carriers inside each month, answering “who is leading when?”
 
 ```mermaid
 %%{init:{"theme":"base","fontFamily":"Helvetica Neue,Helvetica,Arial,sans-serif","flowchart":{"curve":"basis","padding":14,"nodeSpacing":45,"rankSpacing":55},"themeVariables":{"fontSize":"15px","background":"#FFFFFF","primaryColor":"#EEF2F7","primaryTextColor":"#14213D","primaryBorderColor":"#14213D","secondaryColor":"#FFF1E3","secondaryTextColor":"#14213D","tertiaryColor":"#E7F4F1","tertiaryTextColor":"#14213D","lineColor":"#64748B","textColor":"#14213D","edgeLabelBackground":"#FFFFFF","clusterBkg":"#F5F8FC","clusterBorder":"#94A3B8","nodeBorder":"#14213D","mainBkg":"#EEF2F7","titleColor":"#14213D"}}}%%
