@@ -1,0 +1,21 @@
+carrier_id,carrier_name,region,on_time_rate,base_rate_usd_per_km_ton,fleet_size
+C001,Atlas Freight,East,0.8026,1.311,79
+C002,BlueHarbor Lines,West,0.7695,1.389,2703
+C003,Cascade Cargo,East,0.8659,1.372,106
+C004,GulfStream Logistics,West,0.804,0.921,1236
+C005,HarborLink,East,0.8963,1.377,2013
+C006,IronRoad Carriers,West,0.8894,1.826,3502
+C007,NorthStar Shipping,Central,0.8688,0.808,416
+C008,Summit Logistics,North,0.729,1.651,2665
+C009,Tundra Transport,East,0.8477,1.392,2155
+C010,Orion Haulage,East,0.8771,1.125,569https://www.examtopics.com/assets/media/exam-media/04257/0023000001.png
+C011,Lakeside Logistics,South,0.8868,2.05,3390
+C012,Quantum Freight,South,0.7882,1.617,3388
+C013,Meridian Freight,North,0.8513,0.93,1956
+C014,Delta Haulage,East,0.8213,1.376,3782
+C015,Kestrel Cargo,Central,0.8315,1.552,2447
+C016,Everest Express,North,0.9437,1.284,3620
+C017,Redwood Carriers,East,0.8315,1.589,3844
+C018,Falcon Freight,Central,0.878,1.327,2300
+C019,Pioneer Lines,Central,0.9331,1.584,1159
+C020,Jupiter Transport,South,0.845,1.853,624
