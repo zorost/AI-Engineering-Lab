@@ -1,0 +1,27 @@
+[project]
+name = "ai-engineering-lab"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Klaus Roßmann", email = "klaus.rossmann@aol.de" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "duckdb>=1.0",
+    "ipykernel>=6.29",
+    "jupyter>=1.0",
+    "matplotlib>=3.8",
+    "numpy>=1.26",
+    "openpyxl>=3.1",
+    "pandas>=2.1",
+    "pyarrow>=15.0",
+    "scikit-learn>=1.4",
+]
+
+[project.scripts]
+ai-engineering-lab = "ai_engineering_lab:main"
+
+[build-system]
+requires = ["uv_build>=0.12.23,<0.13.0"]
+build-backend = "uv_build"
